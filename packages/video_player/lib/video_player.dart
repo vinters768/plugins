@@ -149,7 +149,8 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
   /// The name of the asset is given by the [dataSource] argument and must not be
   /// null. The [package] argument must be non-null when the asset comes from a
   /// package and null otherwise.
-  VideoPlayerController.asset(this.dataSource, {this.package})
+  VideoPlayerController.asset(this.dataSource,
+      {this.package, this.progressUpdateRate: 500})
       : dataSourceType = DataSourceType.asset,
         super(VideoPlayerValue(duration: null));
 
@@ -158,7 +159,7 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
   ///
   /// The URI for the video is given by the [dataSource] argument and must not be
   /// null.
-  VideoPlayerController.network(this.dataSource)
+  VideoPlayerController.network(this.dataSource, {this.progressUpdateRate: 500})
       : dataSourceType = DataSourceType.network,
         package = null,
         super(VideoPlayerValue(duration: null));
@@ -167,7 +168,7 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
   ///
   /// This will load the file from the file-URI given by:
   /// `'file://${file.path}'`.
-  VideoPlayerController.file(File file)
+  VideoPlayerController.file(File file, {this.progressUpdateRate: 500})
       : dataSource = 'file://${file.path}',
         dataSourceType = DataSourceType.file,
         package = null,
@@ -186,6 +187,7 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
   Completer<void> _creatingCompleter;
   StreamSubscription<dynamic> _eventSubscription;
   _VideoAppLifeCycleObserver _lifeCycleObserver;
+  final int progressUpdateRate;
 
   @visibleForTesting
   int get textureId => _textureId;
@@ -231,15 +233,17 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
       final Map<dynamic, dynamic> map = event;
       switch (map['event']) {
         case 'initialized':
-          value = value.copyWith(
-            duration: Duration(milliseconds: map['duration']),
-            size: Size(map['width']?.toDouble() ?? 0.0,
-                map['height']?.toDouble() ?? 0.0),
-          );
-          initializingCompleter.complete(null);
-          _applyLooping();
-          _applyVolume();
-          _applyPlayPause();
+          if (!value.initialized) {
+            value = value.copyWith(
+              duration: Duration(milliseconds: map['duration']),
+              size: Size(map['width']?.toDouble() ?? 0.0,
+                  map['height']?.toDouble() ?? 0.0),
+            );
+            initializingCompleter.complete(null);
+            _applyLooping();
+            _applyVolume();
+            _applyPlayPause();
+          }
           break;
         case 'completed':
           value = value.copyWith(isPlaying: false, position: value.duration);
@@ -339,7 +343,7 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
         <String, dynamic>{'textureId': _textureId},
       );
       _timer = Timer.periodic(
-        const Duration(milliseconds: 500),
+        Duration(milliseconds: progressUpdateRate),
         (Timer timer) async {
           if (_isDisposed) {
             return;
@@ -416,6 +420,7 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
   /// [volume] indicates a value between 0.0 (silent) and 1.0 (full volume) on a
   /// linear scale.
   Future<void> setVolume(double volume) async {
+    if (_isDisposed) return;
     value = value.copyWith(volume: volume.clamp(0.0, 1.0));
     await _applyVolume();
   }
