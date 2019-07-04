@@ -47,6 +47,7 @@ class VideoPlayerValue {
     this.isLooping = false,
     this.isBuffering = false,
     this.volume = 1.0,
+    this.rate = 1.0,
     this.errorDescription,
   });
 
@@ -78,6 +79,9 @@ class VideoPlayerValue {
   /// The current volume of the playback.
   final double volume;
 
+  /// The current rate of the playback.
+  final double rate;
+
   /// A description of the error if present.
   ///
   /// If [hasError] is false this is [null].
@@ -101,6 +105,7 @@ class VideoPlayerValue {
     bool isLooping,
     bool isBuffering,
     double volume,
+    double rate,
     String errorDescription,
   }) {
     return VideoPlayerValue(
@@ -112,6 +117,7 @@ class VideoPlayerValue {
       isLooping: isLooping ?? this.isLooping,
       isBuffering: isBuffering ?? this.isBuffering,
       volume: volume ?? this.volume,
+      rate: rate ?? this.rate,
       errorDescription: errorDescription ?? this.errorDescription,
     );
   }
@@ -127,6 +133,7 @@ class VideoPlayerValue {
         'isLooping: $isLooping, '
         'isBuffering: $isBuffering'
         'volume: $volume, '
+        'rate: $rate, '
         'errorDescription: $errorDescription)';
   }
 }
@@ -189,6 +196,7 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
   _VideoAppLifeCycleObserver _lifeCycleObserver;
   final int progressUpdateRate;
 
+  Function() onCompleted;
   @visibleForTesting
   int get textureId => _textureId;
 
@@ -248,6 +256,10 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
         case 'completed':
           value = value.copyWith(isPlaying: false, position: value.duration);
           _timer?.cancel();
+
+          if (onCompleted != null) {
+            onCompleted();
+          }
           break;
         case 'bufferingUpdate':
           final List<dynamic> values = map['values'];
@@ -423,6 +435,25 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
     if (_isDisposed) return;
     value = value.copyWith(volume: volume.clamp(0.0, 1.0));
     await _applyVolume();
+  }
+
+  Future<void> setRate(double rate) async {
+    if (_isDisposed) return;
+    value = value.copyWith(rate: rate);
+    await _applyRate();
+  }
+
+  Future<void> _applyRate() async {
+    if (!value.initialized || _isDisposed) {
+      return;
+    }
+    // TODO(amirh): remove this on when the invokeMethod update makes it to stable Flutter.
+    // https://github.com/flutter/flutter/issues/26431
+    // ignore: strong_mode_implicit_dynamic_method
+    await _channel.invokeMethod(
+      'setRate',
+      <String, dynamic>{'textureId': _textureId, 'rate': value.rate},
+    );
   }
 }
 

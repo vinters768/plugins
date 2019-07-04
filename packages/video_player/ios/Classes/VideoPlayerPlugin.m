@@ -342,6 +342,14 @@ static inline CGFloat radiansToDegrees(CGFloat radians) {
   _player.volume = (volume < 0.0) ? 0.0 : ((volume > 1.0) ? 1.0 : volume);
 }
 
+-(void)setRate:(float)rate{
+    if (@available(iOS 10.0, *)) {
+        [_player setAutomaticallyWaitsToMinimizeStalling:NO];
+    }
+    
+    [_player setRate:rate time:kCMTimeInvalid atHostTime:kCMTimeInvalid];
+}
+
 - (CVPixelBufferRef)copyPixelBuffer {
   CMTime outputItemTime = [_videoOutput itemTimeForHostTime:CACurrentMediaTime()];
   if ([_videoOutput hasNewPixelBufferForItemTime:outputItemTime]) {
@@ -494,7 +502,10 @@ static inline CGFloat radiansToDegrees(CGFloat radians) {
     } else if ([@"pause" isEqualToString:call.method]) {
       [player pause];
       result(nil);
-    } else {
+    }else if ([@"setRate" isEqualToString:call.method]) {
+        [player setRate:[[argsMap objectForKey:@"rate"] doubleValue]];
+        result(nil);
+    }else {
       result(FlutterMethodNotImplemented);
     }
   }
